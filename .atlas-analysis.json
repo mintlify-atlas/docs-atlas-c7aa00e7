@@ -1,0 +1,83 @@
+{
+  "projectType": "ai-ml",
+  "projectName": "Prime Number Neural Network",
+  "projectDescription": "A research project that models numbers as multi-dimensional entities to train a two-stage ML ensemble (Decision Tree + MLP) to identify prime numbers using fractal remainder geometry and multi-base arithmetic features.",
+  "theme": "palm",
+  "primaryColor": "#6366f1",
+  "lightColor": "#818cf8",
+  "darkColor": "#4338ca",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Mathematical Concepts",
+            "pages": [
+              "concepts/arithmetic-dimensions",
+              "concepts/modulo-shift-threshold",
+              "concepts/primorial-bases",
+              "concepts/digit-sum-law",
+              "concepts/binary-density",
+              "concepts/remainder-geometry"
+            ]
+          },
+          {
+            "group": "Model Architecture",
+            "pages": [
+              "architecture/overview",
+              "architecture/model-a-filter",
+              "architecture/model-b-dnn",
+              "architecture/ensemble-pipeline"
+            ]
+          },
+          {
+            "group": "Training & Evaluation",
+            "pages": [
+              "training/dataset",
+              "training/results"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core Modules",
+            "pages": [
+              "api/neural-encoder",
+              "api/neural-net",
+              "api/final-ensemble-test",
+              "api/feature-miner"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-dimensional number encoding using base systems (Base-6, Base-30, Base-210)",
+    "Two-stage ensemble: Decision Tree filter + Deep MLP neural network",
+    "Fractal remainder geometry for prime probability estimation",
+    "Fermat witness flags for pseudoprime detection",
+    "Cyclical modulo scaling for infinite-range extrapolation",
+    "100% precision (zero false positives) across all tested ranges up to 110,000",
+    "Discovery of the Modulo Shift Threshold law (P_k^2 boundary)",
+    "Prime Feedback effect: remainder primality as a probabilistic signal"
+  ],
+  "publicApiSurface": [
+    "extract_all_dimensions(n) -> dict  [neural_encoder.py]",
+    "sum_of_digits(n, base) -> int  [neural_encoder.py]",
+    "num_digits(n, base) -> int  [neural_encoder.py]",
+    "build_ensemble()  [neural_net.py]",
+    "run_evaluation()  [final_ensemble_test.py]",
+    "generate_range(start, end) -> DataFrame  [final_ensemble_test.py]",
+    "generate_dimensions(n) -> dict  [feature_miner.py]",
+    "analyze_1_to_100()  [feature_miner.py]"
+  ]
+}
