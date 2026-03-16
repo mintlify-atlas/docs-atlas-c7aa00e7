@@ -1,0 +1,95 @@
+---
+title: "Architecture overview"
+description: "The two-stage ensemble pipeline for prime number classification."
+---
+
+## Why a single model fails
+
+A naive approach — feeding a raw number into a classifier — fails because of the **Intersections problem**. When a model is only given lower-dimensional features (e.g., `mod_2`, `mod_3`, `mod_5`, `mod_7`), composites whose prime factors all exceed those moduli become indistinguishable from primes.
+
+For example, **1111** (= 11 × 101) and **3001** (prime) share identical values for `is_even`, `ends_with`, `digit_sum`, `mod_3`, `mod_5`, and `mod_7`. To the model, they are the same number. Analysis of the first 10,000 integers reveals **296 such intersection branches**, trapping 988 primes and 932 composites in the same dimensional footprint.
+
+Adding more explicit modulo dimensions (`mod_11`, `mod_13`, …) is not a sustainable solution — the threshold where each new prime $P_k$ becomes mandatory is exactly $P_k^2$, meaning infinite dimensions would be required for arbitrarily large numbers.
+
+## The solution: a 2-stage ensemble pipeline
+
+The project resolves the intersections problem with a two-stage pipeline that separates numbers with rigid mathematical certainty from numbers requiring deep non-linear analysis.
+
+<Steps>
+  <Step title="Feature extraction">
+    Every input number $N$ is passed through `extract_all_dimensions(N)` in `neural_encoder.py`, which converts $N$ into its full multi-dimensional arithmetic footprint — base-system endings, digit-sum channels, indivisibility flags, Fermat witnesses, and fractal remainder geometry.
+  </Step>
+
+  <Step title="Stage 1 — Model A: Base-System Filter">
+    A shallow **Decision Tree** (`max_depth=5`) is evaluated on six base-system features. It uses a class weight of `{0: 20, 1: 1}` to make false positives 20× more costly than false negatives.
+
+    - Numbers where Model A assigns P(prime) **< 0.01** are classified as **Composite** immediately.
+    - Numbers where P(prime) **≥ 0.01** are forwarded to Stage 2 as "intersection candidates."
+
+    Model A consistently eliminates **~77% of composites** with zero false positives.
+  </Step>
+
+  <Step title="Stage 2 — Model B: Deep MLP">
+    A **Multi-Layer Perceptron** (64 → 128 → 64 neurons, ReLU) resolves the remaining candidates using 13 non-linear fractal features — Fermat witnesses, remainder geometry, and digit-density statistics.
+
+    - Numbers where Model B assigns P(prime) **> 0.9** are classified as **Prime**.
+    - All others are classified as **Composite**.
+
+    The 0.9 threshold maximises precision: the model only calls a number prime when it is at least 90% confident.
+  </Step>
+</Steps>
+
+## Pipeline flow
+
+```
+Input N
+  └─► extract_all_dimensions(N)
+        ├─► [filter_features] → Model A predict_proba
+        │         │
+        │    P(prime) < 0.01 ──► COMPOSITE (done)
+        │         │
+        │    P(prime) ≥ 0.01
+        │         │
+        └─► [complex_features] → Model B predict_proba
+                  │
+             P(prime) > 0.9 ──► PRIME
+                  │
+             P(prime) ≤ 0.9 ──► COMPOSITE
+```
+
+## The Intersections concept
+
+Of the 10,000 numbers in the training range, **2,651 unique dimension combinations** exist:
+
+| Branch type | Count |
+|:---|:---|
+| Composites only (perfect separation) | 2,154 |
+| Primes only (perfect separation) | 201 |
+| Both primes **and** composites (intersections) | 296 |
+
+Model A handles the 2,154 composite-only branches. Model B is trained exclusively on the 296 intersection branches — the roughly 22% of the training set where lower-dimensional rules alone cannot distinguish prime from composite.
+
+## Design decisions
+
+| Decision | Rationale |
+|:---|:---|
+| Class weight `{0: 20, 1: 1}` in Model A | Mislabelling a composite as prime is 20× more penalised; guarantees zero false positives from the filter |
+| 0.05 training threshold for Model A | Ensures borderline cases are forwarded to Model B rather than incorrectly discarded |
+| 0.9 inference threshold for Model B | High-precision gate; only very confident prime predictions pass through |
+| `max_depth=5` for Model A | Deliberately shallow — the tree learns only bold mathematical laws, not overfitted noise |
+| Cyclical Modulo fix | Raw digit sums are converted to `modulo(Base-1)` values so features remain in a consistent range as $N$ grows arbitrarily large |
+
+<CardGroup cols={2}>
+  <Card title="Model A: Base-System Filter" href="/architecture/model-a-filter">
+    How the Decision Tree eliminates ~77% of composites using base-system rules.
+  </Card>
+  <Card title="Model B: Deep Neural Network" href="/architecture/model-b-dnn">
+    How the MLP resolves hard intersection cases with fractal features.
+  </Card>
+  <Card title="Ensemble pipeline" href="/architecture/ensemble-pipeline">
+    The full code-level walkthrough of how both models combine.
+  </Card>
+  <Card title="Training results" href="/training/results">
+    Performance benchmarks across all extrapolation ranges.
+  </Card>
+</CardGroup>

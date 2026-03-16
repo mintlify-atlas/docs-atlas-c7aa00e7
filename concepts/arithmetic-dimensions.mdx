@@ -1,0 +1,212 @@
+---
+title: "Arithmetic Dimensions"
+description: "How numbers are encoded as multi-dimensional vectors for ML classification."
+---
+
+## The Problem with Raw Integers
+
+Feed the number `17` directly into a neural network and it lands as a single scalar on the real number line. That raw representation carries no algebraic signal about prime structure — `17` sits between `16` and `18` with no feature that distinguishes it from its neighbors. Primes appear to scatter randomly across the integers, so a model trained on magnitude alone will fail immediately.
+
+The root cause is the absence of **continuous algebraic structure**. Composite numbers have factors; primes do not. But divisibility is a discrete, non-differentiable property. A classifier cannot gradient-descend its way to "is not divisible by 7" from a single input neuron.
+
+## The Solution: Model Numbers as Vectors
+
+The fix is to stop treating `N` as a number and start treating it as a **coordinate in arithmetic space**. Every integer `N` is decomposed into a fixed-length vector of engineered features — its *arithmetic dimensions* — before it ever reaches a machine learning model.
+
+This transforms the problem: instead of learning that `17` is prime, the model learns that *any number whose dimension-vector looks like this* tends to be prime. The continuous, structured input allows gradient-based and tree-based classifiers to find real decision boundaries.
+
+## The Full Dimension Set
+
+The function `extract_all_dimensions(n)` in `neural_encoder.py` produces 24 features, organized into seven categories:
+
+### Category 1 — Base Number Systems
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `last_digit_base6` | int (0–5) | `N % 6` — captures divisibility by 2 and 3 simultaneously |
+| `last_digit_base10` | int (0–9) | Standard last digit |
+| `last_digit_base30` | int (0–29) | `N % 30` — the Primorial base, encodes divisibility by 2, 3, and 5 |
+
+### Category 2 — Digit Sums
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `sum_base3_mod` | int (0–1) | Digit sum in base 3 mod 2 — equivalent to `N mod 2` |
+| `sum_base6_mod` | int (0–4) | Digit sum in base 6 mod 5 — equivalent to `N mod 5` |
+| `sum_base10_mod` | int (0–8) | Digit sum in base 10 mod 9 — the classic "casting out nines" |
+
+### Category 3 — Indivisibility Flags
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `is_indivisible_by_2` | 0/1 | 1 if `N` is odd (or `N == 2`) |
+| `is_indivisible_by_3` | 0/1 | 1 if `N % 3 != 0` (or `N == 3`) |
+| `is_indivisible_by_5` | 0/1 | 1 if `N % 5 != 0` (or `N == 5`) |
+| `is_indivisible_by_7` | 0/1 | 1 if `N % 7 != 0` (or `N == 7`) |
+
+### Category 4 — Fermat Flags
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `fermat_flag_base2` | 0/1 | `pow(2, N-1, N) == 1` — Fermat's little theorem witness, base 2 |
+| `fermat_flag_base3` | 0/1 | `pow(3, N-1, N) == 1` — base 3 |
+| `fermat_flag_base5` | 0/1 | `pow(5, N-1, N) == 1` — base 5 |
+| `fermat_flag_base7` | 0/1 | `pow(7, N-1, N) == 1` — base 7 |
+
+<Note>
+By Fermat's little theorem, if `N` is prime then `b^(N-1) ≡ 1 (mod N)` for any base `b` not divisible by `N`. Composite numbers that accidentally satisfy this are called Fermat pseudoprimes. Using four independent bases simultaneously makes accidental agreement statistically negligible.
+</Note>
+
+### Category 5 — Structural
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `dist_to_square` | int ≥ 0 | `ceil(sqrt(N))² - N` — distance to the next perfect square |
+| `modular_inverse_2` | int | `(N+1)//2` for odd `N`, else `0` — the modular reciprocal of 2 |
+
+### Category 6 — Fractal / Remainder Geometry
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `is_rem_9_prime` | 0/1 | 1 if `N % 9` is itself a prime number |
+| `is_rem_30_prime` | 0/1 | 1 if `N % 30` is itself a prime number |
+| `rem_30_base3_sum` | int | Digit sum of `N % 30` when written in base 3 |
+| `rem_9_bin_pop` | int | Number of `1`-bits in the binary representation of `N % 9` |
+
+### Category 7 — Palindrome / Digit Statistics
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `is_palindrome_10` | 0/1 | 1 if `N` reads the same forwards and backwards in base 10 |
+| `len_base10` | int | Number of decimal digits in `N` |
+| `ratio_base10` | float | Digit sum divided by digit count — average digit value |
+| `distance_from_max_sum` | int | `(9 × len) - digit_sum` — gap from the theoretical maximum digit sum |
+
+## Real Example: N = 17
+
+Running `extract_all_dimensions(17)` produces:
+
+| Dimension | Value | Interpretation |
+|-----------|-------|----------------|
+| `last_digit_base6` | 5 | Valid prime ending in base 6 |
+| `last_digit_base10` | 7 | Valid prime ending in base 10 |
+| `last_digit_base30` | 17 | Valid prime ending in base 30 |
+| `sum_base3_mod` | 1 | Odd (17 in base 3 is "122", digit sum 5, 5 % 2 = 1) |
+| `sum_base6_mod` | 2 | 17 in base 6 is "25", digit sum 7, 7 % 5 = 2 |
+| `sum_base10_mod` | 8 | Digit sum 1+7=8, 8 % 9 = 8 |
+| `is_indivisible_by_2` | 1 | Not divisible by 2 |
+| `is_indivisible_by_3` | 1 | Not divisible by 3 |
+| `is_indivisible_by_5` | 1 | Not divisible by 5 |
+| `is_indivisible_by_7` | 1 | Not divisible by 7 |
+| `fermat_flag_base2` | 1 | 2^16 ≡ 1 (mod 17) ✓ |
+| `fermat_flag_base3` | 1 | 3^16 ≡ 1 (mod 17) ✓ |
+| `fermat_flag_base5` | 1 | 5^16 ≡ 1 (mod 17) ✓ |
+| `fermat_flag_base7` | 1 | 7^16 ≡ 1 (mod 17) ✓ |
+| `dist_to_square` | 8 | Next square is 25 (5²), distance = 25 − 17 = 8 |
+| `modular_inverse_2` | 9 | (17+1)//2 = 9 |
+| `is_rem_9_prime` | 0 | 17 % 9 = 8, not prime |
+| `is_rem_30_prime` | 1 | 17 % 30 = 17, which is prime |
+| `rem_30_base3_sum` | 5 | 17 in base 3 is "122", digit sum = 5 |
+| `rem_9_bin_pop` | 1 | 8 in binary is "1000", popcount = 1 |
+| `is_palindrome_10` | 0 | "17" ≠ "71" |
+| `len_base10` | 2 | Two decimal digits |
+| `ratio_base10` | 4.0 | (1+7) / 2 = 4.0 |
+| `distance_from_max_sum` | 10 | (9×2) − 8 = 10 |
+
+## The Source Code
+
+```python
+def extract_all_dimensions(n):
+    """
+    The Master Engine: Generates all engineered mathematical dimensions for a single number N.
+    """
+    if n < 1:
+        return None
+        
+    dimensions = {}
+    
+    # 1. Base Number Systems (The "Last Digit Dictatorships")
+    dimensions['last_digit_base6'] = n % 6      # Captures mod 2 and mod 3
+    dimensions['last_digit_base10'] = n % 10    # Standard
+    dimensions['last_digit_base30'] = n % 30    # The Primorial Base (mod 2, 3, 5)
+    
+    # 2. Digit Sums (The "Sum Modulo Law" channels)
+    dimensions['sum_base3_mod'] = sum_of_digits(n, 3) % 2
+    dimensions['sum_base6_mod'] = sum_of_digits(n, 6) % 5
+    dimensions['sum_base10_mod'] = sum_of_digits(n, 10) % 9
+    
+    # 3. Indivisibility Flags (Coprime Master Rules)
+    # Fix: Primes 2, 3, 5, 7 should be considered indivisible by themselves
+    dimensions['is_indivisible_by_2'] = int(n % 2 != 0 or n == 2)
+    dimensions['is_indivisible_by_3'] = int(n % 3 != 0 or n == 3)
+    dimensions['is_indivisible_by_5'] = int(n % 5 != 0 or n == 5)
+    dimensions['is_indivisible_by_7'] = int(n % 7 != 0 or n == 7)
+    
+    # 4. Structural Math Features (Higher-Order)
+    # Fermat Pseudoprime Flags: (Base**(N-1)) % N == 1
+    if n <= 2:
+        dimensions['fermat_flag_base2'] = 0
+        dimensions['fermat_flag_base3'] = 0
+        dimensions['fermat_flag_base5'] = 0
+        dimensions['fermat_flag_base7'] = 0
+    else:
+        # Binarized Fermat Witnesses
+        dimensions['fermat_flag_base2'] = int(pow(2, n - 1, n) == 1)
+        dimensions['fermat_flag_base3'] = int(pow(3, n - 1, n) == 1)
+        dimensions['fermat_flag_base5'] = int(pow(5, n - 1, n) == 1)
+        dimensions['fermat_flag_base7'] = int(pow(7, n - 1, n) == 1)
+        
+    # Distance to Nearest Square: ceil(sqrt(N))**2 - N
+    dimensions['dist_to_square'] = math.ceil(math.sqrt(n))**2 - n
+    
+    # Modular Reciprocal (2^-1 mod N): (N+1)//2 for odd N, 0 for even
+    if n % 2 != 0:
+        dimensions['modular_inverse_2'] = (n + 1) // 2
+    else:
+        dimensions['modular_inverse_2'] = 0
+
+    # 5. Fractal / Remainder Geometry
+    from sympy import isprime
+    rem_9 = n % 9
+    rem_30 = n % 30
+    
+    dimensions['is_rem_9_prime'] = int(isprime(rem_9))
+    dimensions['is_rem_30_prime'] = int(isprime(rem_30))
+    dimensions['rem_30_base3_sum'] = sum_of_digits(rem_30, 3)
+    dimensions['rem_9_bin_pop'] = bin(rem_9).count('1')
+    
+    # 6. Palindromes & Digit Stats
+    s_n = str(n)
+    dimensions['is_palindrome_10'] = int(s_n == s_n[::-1])
+    dimensions['len_base10'] = num_digits(n, 10)
+    dimensions['ratio_base10'] = sum_of_digits(n, 10) / dimensions['len_base10']
+    
+    max_sum_theoretical = (9 * dimensions['len_base10'])
+    dimensions['distance_from_max_sum'] = max_sum_theoretical - sum_of_digits(n, 10)
+    
+    return dimensions
+```
+
+## Why These Dimensions Capture Prime Structure
+
+Raw division is not required anywhere in this feature set. Instead, each dimension encodes a *residue* — the leftover after a modular operation — which is a continuous-enough signal for gradient-based learning and decision trees alike.
+
+- **Base endings** encode multiple divisibility rules in a single integer, giving both tree and network models a compact decision surface.
+- **Digit sums** provide alternative views of the same modular arithmetic, letting the network triangulate divisibility without explicit division.
+- **Fermat flags** exploit number theory directly: a composite that passes all four witnesses is astronomically rare, so four `1`s in a row is a powerful positive signal.
+- **Fractal remainder features** capture the self-similar structure of prime distribution across nested base systems — patterns invisible to any single-modulus representation.
+
+<CardGroup cols={2}>
+  <Card title="Primorial Bases" href="/concepts/primorial-bases">
+    How base-6 and base-30 eliminate 73% of composites from the last digit alone
+  </Card>
+  <Card title="Digit Sum Law" href="/concepts/digit-sum-law">
+    The mathematical equivalence between digit sums and modular residues
+  </Card>
+  <Card title="Binary Density" href="/concepts/binary-density">
+    How 1-bit distribution in binary separates primes from composites
+  </Card>
+  <Card title="Remainder Geometry" href="/concepts/remainder-geometry">
+    Fractal patterns in remainder representations that predict prime probability
+  </Card>
+</CardGroup>

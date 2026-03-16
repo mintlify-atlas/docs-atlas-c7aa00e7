@@ -1,0 +1,122 @@
+---
+title: "final_ensemble_test"
+description: "Comprehensive evaluation of the ensemble across near, far, and infinite-scale extrapolation ranges."
+---
+
+The `final_ensemble_test` module is the definitive evaluation harness for the Prime Number Neural Network. It extends the basic ensemble from `neural_net` with fractal remainder-geometry features, aggressive class-weighting, and calibrated probability thresholds — then measures performance across three separate out-of-distribution test ranges.
+
+## Functions
+
+### `run_evaluation()`
+
+Trains the full fractal ensemble and evaluates it on four ranges: the training baseline and three unseen extrapolation windows.
+
+**Parameters:** None
+
+**Returns:** `None`
+
+#### What it does
+
+<Steps>
+  <Step title="Generate training data">
+    Calls `generate_range(1, 10000)` to build the training DataFrame.
+  </Step>
+  <Step title="Generate test ranges">
+    Builds three separate test DataFrames:
+    - **Near extrapolation:** 10,001–20,000
+    - **Far extrapolation:** 50,000–60,000
+    - **Infinite-scale extrapolation:** 100,000–110,000
+  </Step>
+  <Step title="Train Model A (filter) with class weighting">
+    Fits a `DecisionTreeClassifier(max_depth=5, class_weight={0: 20, 1: 1}, random_state=42)` on `filter_features`. The heavy penalty on class 0 (composite) dramatically suppresses false positives — the model is forced to be confident before predicting composite.
+  </Step>
+  <Step title="Apply Model A probability threshold">
+    Uses `predict_proba` with a threshold of **0.05** on the training set to identify intersection candidates, rather than the default 0.5 decision boundary.
+  </Step>
+  <Step title="Train Model B (DNN) on Fermat witness features">
+    Fits an `MLPClassifier(hidden_layer_sizes=(64, 128, 64), activation='relu', max_iter=2000, random_state=42)` on `complex_features` for intersection candidates only.
+  </Step>
+  <Step title="Evaluate each range">
+    Calls the internal `evaluate_set()` helper for all four ranges (train baseline + three test windows), printing accuracy and a classification report for each.
+  </Step>
+</Steps>
+
+#### Feature sets
+
+**`filter_features`** — used by Model A:
+
+```python
+['last_digit_base6', 'last_digit_base30',
+ 'is_indivisible_by_2', 'is_indivisible_by_3',
+ 'is_indivisible_by_5', 'is_indivisible_by_7']
+```
+
+**`complex_features`** — used by Model B (Fermat witness and remainder geometry features):
+
+```python
+['fermat_flag_base2', 'fermat_flag_base3', 'fermat_flag_base5', 'fermat_flag_base7',
+ 'dist_to_square', 'modular_inverse_2',
+ 'is_rem_9_prime', 'is_rem_30_prime',
+ 'rem_30_base3_sum', 'rem_9_bin_pop',
+ 'ratio_base10', 'distance_from_max_sum', 'is_palindrome_10']
+```
+
+<Warning>
+  Generating 130,000 numbers with Fermat witness computations (via `sympy.isprime` and modular exponentiation) takes several minutes. Plan accordingly before running the full evaluation.
+</Warning>
+
+#### How to run
+
+```bash
+python final_ensemble_test.py
+```
+
+---
+
+### `generate_range(start, end)`
+
+Generates a feature DataFrame for all integers in the inclusive range `[start, end]`.
+
+<ParamField path="start" type="int" required>
+  First integer in the range (inclusive).
+</ParamField>
+
+<ParamField path="end" type="int" required>
+  Last integer in the range (inclusive).
+</ParamField>
+
+**Returns:** `pd.DataFrame` — one row per integer, with all 24 feature columns from `extract_all_dimensions` plus two additional columns:
+
+<ResponseField name="is_prime" type="int (0 or 1)">
+  Ground-truth primality label, computed via `sympy.isprime`.
+</ResponseField>
+
+<ResponseField name="number" type="int">
+  The integer itself.
+</ResponseField>
+
+<Note>
+  Numbers for which `extract_all_dimensions` returns `None` (i.e., `n < 1`) are silently skipped and will not appear as rows in the returned DataFrame.
+</Note>
+
+#### Example
+
+```python
+from final_ensemble_test import generate_range
+
+df = generate_range(1, 100)
+print(df.shape)                               # (100, 26)
+print(df.columns.tolist())                    # ['last_digit_base6', ..., 'is_prime', 'number']
+print(df[df['is_prime'] == 1]['number'].tolist())  # [2, 3, 5, 7, 11, ...]
+```
+
+---
+
+<Columns cols={2}>
+  <Card title="neural_encoder" icon="microchip" href="/api/neural-encoder">
+    Master dimension extraction engine that encodes any integer as a feature vector.
+  </Card>
+  <Card title="feature_miner" icon="magnifying-glass" href="/api/feature-miner">
+    Early-phase rule mining using basic arithmetic dimensions and a decision tree.
+  </Card>
+</Columns>

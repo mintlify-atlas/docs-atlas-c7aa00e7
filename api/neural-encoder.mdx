@@ -1,0 +1,219 @@
+---
+title: "neural_encoder"
+description: "The master dimension extraction engine that encodes any integer as a multi-dimensional feature vector."
+---
+
+The `neural_encoder` module is the foundation of the Prime Number Neural Network pipeline. It provides helper functions for base arithmetic and the primary `extract_all_dimensions` function that transforms any positive integer into a rich 24-key feature dictionary used by all downstream models.
+
+## Functions
+
+### `extract_all_dimensions(n)`
+
+The master engine. Generates all engineered mathematical dimensions for a single number `n`.
+
+<ParamField path="n" type="int" required>
+  Any positive integer ≥ 1. Returns `None` if `n < 1`.
+</ParamField>
+
+**Returns:** `dict` — a dictionary of 24 arithmetic features, or `None` if `n < 1`.
+
+<Note>
+  `is_rem_9_prime` and `is_rem_30_prime` are computed using `sympy.isprime`, which is imported internally. For `n ≤ 2`, all four `fermat_flag_*` keys are set to `0`.
+</Note>
+
+#### Return keys
+
+<ResponseField name="last_digit_base6" type="int">
+  `n % 6` — the last digit of `n` in Base-6. Simultaneously encodes divisibility by 2 and by 3.
+</ResponseField>
+
+<ResponseField name="last_digit_base10" type="int">
+  `n % 10` — the standard last digit in Base-10.
+</ResponseField>
+
+<ResponseField name="last_digit_base30" type="int">
+  `n % 30` — the last digit in the Primorial base (30 = 2 × 3 × 5). Encodes divisibility by 2, 3, and 5 simultaneously.
+</ResponseField>
+
+<ResponseField name="sum_base3_mod" type="int">
+  `sum_of_digits(n, 3) % 2` — digit sum of `n` in Base-3, reduced mod 2.
+</ResponseField>
+
+<ResponseField name="sum_base6_mod" type="int">
+  `sum_of_digits(n, 6) % 5` — digit sum of `n` in Base-6, reduced mod 5.
+</ResponseField>
+
+<ResponseField name="sum_base10_mod" type="int">
+  `sum_of_digits(n, 10) % 9` — digit sum of `n` in Base-10, reduced mod 9. Equivalent to `n % 9` by the casting-out-nines rule.
+</ResponseField>
+
+<ResponseField name="is_indivisible_by_2" type="int (0 or 1)">
+  `1` if `n % 2 != 0` OR `n == 2` (i.e., the number is odd, or is the prime 2 itself).
+</ResponseField>
+
+<ResponseField name="is_indivisible_by_3" type="int (0 or 1)">
+  `1` if `n % 3 != 0` OR `n == 3`.
+</ResponseField>
+
+<ResponseField name="is_indivisible_by_5" type="int (0 or 1)">
+  `1` if `n % 5 != 0` OR `n == 5`.
+</ResponseField>
+
+<ResponseField name="is_indivisible_by_7" type="int (0 or 1)">
+  `1` if `n % 7 != 0` OR `n == 7`.
+</ResponseField>
+
+<Expandable title="Fermat witness flags and structural features">
+
+<ResponseField name="fermat_flag_base2" type="int (0 or 1)">
+  `int(pow(2, n-1, n) == 1)` — Fermat primality witness with base 2. All primes pass; some Carmichael composites may also pass.
+</ResponseField>
+
+<ResponseField name="fermat_flag_base3" type="int (0 or 1)">
+  `int(pow(3, n-1, n) == 1)` — Fermat primality witness with base 3.
+</ResponseField>
+
+<ResponseField name="fermat_flag_base5" type="int (0 or 1)">
+  `int(pow(5, n-1, n) == 1)` — Fermat primality witness with base 5.
+</ResponseField>
+
+<ResponseField name="fermat_flag_base7" type="int (0 or 1)">
+  `int(pow(7, n-1, n) == 1)` — Fermat primality witness with base 7.
+</ResponseField>
+
+<ResponseField name="dist_to_square" type="int">
+  `ceil(sqrt(n))² - n` — distance from `n` to the nearest perfect square at or above it. Zero when `n` is a perfect square.
+</ResponseField>
+
+<ResponseField name="modular_inverse_2" type="int">
+  `(n + 1) // 2` for odd `n`; `0` for even `n`. Approximates the modular multiplicative inverse of 2 modulo `n`.
+</ResponseField>
+
+<ResponseField name="is_rem_9_prime" type="int (0 or 1)">
+  `int(isprime(n % 9))` — whether the remainder of `n` divided by 9 is itself prime.
+</ResponseField>
+
+<ResponseField name="is_rem_30_prime" type="int (0 or 1)">
+  `int(isprime(n % 30))` — whether the remainder of `n` divided by 30 is itself prime.
+</ResponseField>
+
+<ResponseField name="rem_30_base3_sum" type="int">
+  `sum_of_digits(n % 30, 3)` — digit sum of `(n % 30)` when written in Base-3.
+</ResponseField>
+
+<ResponseField name="rem_9_bin_pop" type="int">
+  Population count (number of `1`-bits) in the binary representation of `n % 9`.
+</ResponseField>
+
+<ResponseField name="is_palindrome_10" type="int (0 or 1)">
+  `1` if `str(n)` is equal to its own reverse (a Base-10 palindrome).
+</ResponseField>
+
+<ResponseField name="len_base10" type="int">
+  Number of digits in `n` when written in Base-10.
+</ResponseField>
+
+<ResponseField name="ratio_base10" type="float">
+  `sum_of_digits(n, 10) / len_base10` — average digit value.
+</ResponseField>
+
+<ResponseField name="distance_from_max_sum" type="int">
+  `(9 × len_base10) - sum_of_digits(n, 10)` — how far the digit sum is from the theoretical maximum for a number of the same length (e.g., 999…9).
+</ResponseField>
+
+</Expandable>
+
+#### Usage example
+
+```python
+from neural_encoder import extract_all_dimensions
+
+dims = extract_all_dimensions(17)
+print(dims)
+# Output:
+# {
+#   'last_digit_base6': 5,
+#   'last_digit_base10': 7,
+#   'last_digit_base30': 17,
+#   'sum_base3_mod': 0,
+#   'is_indivisible_by_2': 1,
+#   'fermat_flag_base2': 1,
+#   ...
+# }
+```
+
+---
+
+### `sum_of_digits(n, base)`
+
+Computes the sum of digits of `n` when written in the given base.
+
+<ParamField path="n" type="int" required>
+  The non-negative integer to decompose.
+</ParamField>
+
+<ParamField path="base" type="int" required>
+  The numeric base to use for digit decomposition (e.g., 2, 3, 6, 10).
+</ParamField>
+
+**Returns:** `int` — the sum of all digits of `n` in the given base. Returns `0` when `n == 0`.
+
+```python
+def sum_of_digits(n, base):
+    if n == 0: return 0
+    total = 0
+    while n > 0:
+        total += n % base
+        n //= base
+    return total
+```
+
+#### Examples
+
+```python
+sum_of_digits(17, 3)  # 17 in base-3 is "122" → 1+2+2 = 5
+sum_of_digits(30, 6)  # 30 in base-6 is "50"  → 5+0 = 5
+```
+
+---
+
+### `num_digits(n, base)`
+
+Counts the number of digits required to represent `n` in the given base.
+
+<ParamField path="n" type="int" required>
+  The non-negative integer to measure. Returns `1` when `n == 0`.
+</ParamField>
+
+<ParamField path="base" type="int" required>
+  The numeric base to use.
+</ParamField>
+
+**Returns:** `int` — the count of digits of `n` in the given base.
+
+```python
+def num_digits(n, base):
+    if n == 0: return 1
+    count = 0
+    while n > 0:
+        count += 1
+        n //= base
+    return count
+```
+
+#### Example
+
+```python
+num_digits(17, 2)  # 17 in binary is "10001" → 5 digits
+```
+
+---
+
+<Columns cols={2}>
+  <Card title="neural_net" icon="network-wired" href="/api/neural-net">
+    Two-stage ensemble that trains and evaluates the prime classification pipeline.
+  </Card>
+  <Card title="final_ensemble_test" icon="flask" href="/api/final-ensemble-test">
+    Comprehensive evaluation across near, far, and infinite-scale extrapolation ranges.
+  </Card>
+</Columns>

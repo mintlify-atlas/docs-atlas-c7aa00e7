@@ -1,0 +1,79 @@
+---
+title: "neural_net"
+description: "The main two-stage ensemble that trains and evaluates the prime classification pipeline."
+---
+
+The `neural_net` module implements a two-stage ensemble model for prime classification. Model A (a shallow decision tree) rapidly eliminates obvious composites using base-system rules. Model B (a multi-layer perceptron) resolves the remaining ambiguous candidates using more complex non-linear features.
+
+## Functions
+
+### `build_ensemble()`
+
+Trains and evaluates the full two-stage ensemble on integers 1–20,000, printing accuracy and a detailed classification report to stdout.
+
+**Parameters:** None
+
+**Returns:** `None`
+
+#### What it does
+
+<Steps>
+  <Step title="Generate the dataset">
+    Calls `extract_all_dimensions` for every integer from 1 to 20,000 and assembles a DataFrame with all feature columns plus `is_prime` and `number`.
+  </Step>
+  <Step title="Split train / test">
+    Training set: integers 1–10,000. Test set: integers 10,001–20,000. The split is strict and sequential — no random shuffling — to force genuine extrapolation.
+  </Step>
+  <Step title="Train Model A (filter)">
+    Fits a `DecisionTreeClassifier(max_depth=5, random_state=42)` on `filter_features`. Model A is intentionally shallow so it learns broad mathematical laws rather than overfitting.
+  </Step>
+  <Step title="Identify intersection candidates">
+    Numbers that Model A predicts as prime (prediction == 1) are forwarded to Model B. Numbers predicted as composite are immediately classified as composite in the final output.
+  </Step>
+  <Step title="Train Model B (deep neural network)">
+    Fits an `MLPClassifier(hidden_layer_sizes=(64, 128, 64), activation='relu', max_iter=1000, random_state=42)` on `complex_features`, but only for the intersection candidates from the training set.
+  </Step>
+  <Step title="Combine predictions">
+    Final rule: if Model A predicts composite → final = composite; if Model A predicts prime → use Model B's prediction.
+  </Step>
+  <Step title="Print results">
+    Prints overall ensemble accuracy and a `sklearn` classification report for the test set (10,001–20,000).
+  </Step>
+</Steps>
+
+#### Feature sets
+
+**`filter_features`** — used by Model A (base-system filter):
+
+```python
+['last_digit_base6', 'last_digit_base30', 'sum_base3', 'sum_base6',
+ 'sum_base10', 'is_even_length_palindrome']
+```
+
+**`complex_features`** — used by Model B (deep neural network):
+
+```python
+['len_base2', 'sum_base2', 'ratio_base2', 'ratio_base10',
+ 'distance_from_max_sum', 'last_digit_base210', 'last_digit_base30']
+```
+
+<Tip>
+  Model B only trains on the intersection candidates — the subset of numbers that Model A passed through. This keeps the neural network focused on the hardest classification cases and reduces training time.
+</Tip>
+
+#### How to run
+
+```bash
+python neural_net.py
+```
+
+---
+
+<Columns cols={2}>
+  <Card title="neural_encoder" icon="microchip" href="/api/neural-encoder">
+    Master dimension extraction engine that encodes any integer as a feature vector.
+  </Card>
+  <Card title="final_ensemble_test" icon="flask" href="/api/final-ensemble-test">
+    Comprehensive evaluation across near, far, and infinite-scale extrapolation ranges.
+  </Card>
+</Columns>

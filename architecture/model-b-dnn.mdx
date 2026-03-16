@@ -1,0 +1,106 @@
+---
+title: "Model B: Deep Neural Network"
+description: "The MLP that resolves hard 'intersection' cases where base-system rules alone are insufficient."
+---
+
+Model B is the second stage of the ensemble. It receives only the numbers that Model A could not confidently eliminate — the "intersection candidates" where primes and composites share identical lower-dimensional footprints.
+
+## Algorithm
+
+```python
+from sklearn.neural_network import MLPClassifier
+
+model_b = MLPClassifier(
+    hidden_layer_sizes=(64, 128, 64),
+    activation='relu',
+    max_iter=2000,
+    random_state=42
+)
+model_b.fit(train_intersections[complex_features], train_intersections['is_prime'])
+```
+
+## Architecture
+
+Model B uses three hidden layers in a bottleneck-expand-bottleneck pattern:
+
+```
+Input (13 features)
+    └─► Dense 64  (ReLU)
+          └─► Dense 128  (ReLU)
+                └─► Dense 64  (ReLU)
+                      └─► Output (sigmoid → P(prime))
+```
+
+ReLU activation allows the network to learn non-linear decision boundaries that simple threshold rules cannot capture. `max_iter=2000` gives the optimiser sufficient iterations to converge on the fractal feature space.
+
+<Note>
+  Model B is trained exclusively on the intersection subset — roughly **22% of the training data**. This focused training means its weights are specialised for the hard cases, not diluted by the easy composites that Model A already handles.
+</Note>
+
+## Feature set
+
+```python
+complex_features = [
+    'fermat_flag_base2', 'fermat_flag_base3', 'fermat_flag_base5', 'fermat_flag_base7',
+    'dist_to_square', 'modular_inverse_2',
+    'is_rem_9_prime', 'is_rem_30_prime',
+    'rem_30_base3_sum', 'rem_9_bin_pop',
+    'ratio_base10', 'distance_from_max_sum', 'is_palindrome_10'
+]
+```
+
+These 13 features encode non-linear, "fractal" dimensions that cannot be captured by simple threshold rules:
+
+### Fermat witnesses
+
+Four independent Fermat's Little Theorem witnesses:
+
+```python
+dimensions['fermat_flag_base2'] = int(pow(2, n - 1, n) == 1)
+dimensions['fermat_flag_base3'] = int(pow(3, n - 1, n) == 1)
+dimensions['fermat_flag_base5'] = int(pow(5, n - 1, n) == 1)
+dimensions['fermat_flag_base7'] = int(pow(7, n - 1, n) == 1)
+```
+
+Fermat's Little Theorem states that if $n$ is prime, then $a^{n-1} \equiv 1 \pmod{n}$ for any $a$ not divisible by $n$. Each base (2, 3, 5, 7) provides an independent probabilistic witness. Using four bases simultaneously eliminates **Fermat pseudoprimes** — composites that pass the test for a single base but fail for others.
+
+### Fractal remainder geometry
+
+| Feature | Description |
+|:---|:---|
+| `is_rem_9_prime` | `1` if `n mod 9` is itself prime — a "Prime Feedback" signal (+2.95% prime probability lift) |
+| `is_rem_30_prime` | `1` if `n mod 30` is itself prime — another Prime Feedback signal (+3.93% lift for mod 7 analogues) |
+| `rem_30_base3_sum` | Digit sum of `n mod 30` in Base-3. When equal to 5, prime density jumps +150.8% above baseline. |
+| `rem_9_bin_pop` | Binary popcount of `n mod 9`. When 0, prime density is 0%. |
+
+### Digit density features
+
+| Feature | Description |
+|:---|:---|
+| `ratio_base10` | Mean digit value (`digit_sum / num_digits`). Primes average 4.672 vs 4.596 for composites. |
+| `distance_from_max_sum` | `(9 × num_digits) − digit_sum`. No prime can have distance 0 (a number of all 9s is always composite). |
+| `dist_to_square` | `ceil(√N)² − N`. Encodes proximity to perfect squares. |
+| `modular_inverse_2` | `(N+1)//2` for odd N, else 0. Encodes modular structure under base-2 arithmetic. |
+| `is_palindrome_10` | `1` if $N$ reads the same forwards and backwards in Base-10. |
+
+## Probability threshold
+
+Model B uses a high-precision threshold at inference:
+
+```python
+b_probs = model_b.predict_proba(X_b)[:, 1]
+b_preds = (b_probs > 0.9).astype(int)
+```
+
+A number is only classified as prime if Model B is at least **90% confident**. This conservative gate maximises precision at the cost of some recall: uncertain numbers default to composite rather than risking a false positive.
+
+This is the direct solution to the "Sledgehammer" problem observed in earlier versions, where a model would classify anything uncertain as prime rather than composite.
+
+<CardGroup cols={2}>
+  <Card title="Model A: Base-System Filter" href="/architecture/model-a-filter">
+    The upstream filter that determines which numbers reach Model B.
+  </Card>
+  <Card title="Ensemble pipeline" href="/architecture/ensemble-pipeline">
+    Full code-level walkthrough of how both models combine at inference.
+  </Card>
+</CardGroup>

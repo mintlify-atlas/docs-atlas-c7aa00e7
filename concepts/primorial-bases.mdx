@@ -1,0 +1,100 @@
+---
+title: "Primorial Bases"
+description: "How base systems reveal the hidden structure of prime numbers."
+---
+
+## The Last Digit Dictatorship
+
+In any positional number system, the last digit of a number is exactly its remainder when divided by the base. This means the last digit alone can *legally forbid* a number from being prime — if that last digit is divisible by any small prime, the entire number must be composite.
+
+This creates what the project calls the **Last Digit Dictatorship**: the choice of base determines which last digits are legally permitted for primes. Choose a base that is a product of many small primes, and the list of permitted endings collapses dramatically.
+
+## Base-10: The Baseline
+
+In the standard decimal system (base 10 = 2 × 5), primes greater than 5 can only end in:
+
+`{1, 3, 7, 9}` — 4 out of 10 possible endings = **40% of the digit space**
+
+Endings 0, 2, 4, 6, 8 are even (divisible by 2); ending 5 is divisible by 5. That eliminates 60% of candidates, leaving 40%.
+
+## Base-6: Doubling the Filter
+
+Base-6 = 2 × 3. Its last digit is `N % 6`, which captures both `mod_2` and `mod_3` in a single feature.
+
+In base 6, primes greater than 5 can only end in:
+
+`{1, 5}` — 2 out of 6 possible endings = **33% of the digit space → eliminates 66% of all integers**
+
+Why only 1 and 5?
+- Endings 0, 2, 4 are even (divisible by 2)
+- Ending 3 is divisible by 3
+- Ending 0 is also divisible by 3
+
+Only digits 1 and 5 in base 6 are coprime to both 2 and 3.
+
+## Base-30: The Primorial Base
+
+Base-30 = 2 × 3 × 5. Its last digit is `N % 30`, which encodes divisibility by 2, 3, and 5 simultaneously.
+
+In base 30, primes greater than 30 can only end in these 8 specific values:
+
+`{1, 7, 11, 13, 17, 19, 23, 29}` — 8 out of 30 possible endings = **26.7% of the digit space → eliminates 73.3% of all integers**
+
+Every other value from 0–29 is divisible by 2, 3, or 5, and is therefore composite (for numbers greater than 5).
+
+<Tip>
+Base-30 is called a **primorial base** because 30 = 2 × 3 × 5 is the product of the first three primes (the 3rd primorial, written 5#). The next primorial is 210 = 2 × 3 × 5 × 7, which would reduce valid endings to 48 out of 210 — only 22.9%.
+</Tip>
+
+## The Code
+
+```python
+# From neural_encoder.py
+dimensions['last_digit_base6'] = n % 6
+dimensions['last_digit_base30'] = n % 30
+```
+
+Two integer operations encode six divisibility checks (2, 3, 5 — three ways each). No explicit division loop required.
+
+## Sample Numbers
+
+| N | `last_digit_base6` | `last_digit_base30` | Is Prime? |
+|---|-------------------|---------------------|----------|
+| 13 | 1 | 13 | Yes |
+| 14 | 2 | 14 | No (even) |
+| 15 | 3 | 15 | No (div by 3 and 5) |
+| 16 | 4 | 16 | No (even) |
+| 17 | 5 | 17 | Yes |
+| 18 | 0 | 18 | No (even, div by 3) |
+| 19 | 1 | 19 | Yes |
+
+All three primes (13, 17, 19) have `last_digit_base6` in `{1, 5}` and `last_digit_base30` in `{1, 7, 11, 13, 17, 19, 23, 29}`. All four composites violate at least one of these constraints — caught without any division.
+
+## AI Implication: Powering Model A
+
+These features give **Model A (the Decision Tree filter)** its core elimination power. A decision tree splits on axis-aligned boundaries, so an integer feature like `last_digit_base30` with only 8 valid prime values is an ideal node.
+
+In practice:
+
+- `last_digit_base30` alone eliminates approximately **73% of all composites** with near-zero false positives
+- `last_digit_base6` adds a secondary check that catches any remaining multiples of 2 or 3 that slipped through
+- Combined with digit sum features, Model A achieves stable composite rejection across every tested range — including 100,000–110,000, far beyond training
+
+<Warning>
+Base-30 endings eliminate composites but do **not** guarantee primality. The number 49 ends in 19 (a valid base-30 ending) yet 49 = 7 × 7. These "survivors" require Model B (the DNN) to resolve.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card title="Arithmetic Dimensions" href="/concepts/arithmetic-dimensions">
+    The complete dimension vector including all base-system features
+  </Card>
+  <Card title="Modulo Shift Threshold" href="/concepts/modulo-shift-threshold">
+    Why composites that survive base-30 filtering require higher prime dimensions
+  </Card>
+  <Card title="Digit Sum Law" href="/concepts/digit-sum-law">
+    How digit sums in these bases connect to modular arithmetic
+  </Card>
+  <Card title="Remainder Geometry" href="/concepts/remainder-geometry">
+    Deeper patterns within the base-30 remainder structure
+  </Card>
+</CardGroup>

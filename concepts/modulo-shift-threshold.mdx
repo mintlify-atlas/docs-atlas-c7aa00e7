@@ -1,0 +1,93 @@
+---
+title: "Modulo Shift Threshold"
+description: "The mathematical law governing when a new prime dimension becomes necessary."
+---
+
+## The Core Problem
+
+A classifier trained only on `mod_2`, `mod_3`, `mod_5`, and `mod_7` performs perfectly on small numbers — and then suddenly fails. It is not a model defect. It is a mathematical inevitability.
+
+As numbers grow larger, composites appear whose *smallest prime factor* lies outside the tracked dimensions. Those composites share an identical dimension-footprint with genuine primes. The model cannot distinguish them because no distinguishing information exists in the features provided.
+
+The question is: **when exactly does each failure occur, and is it predictable?**
+
+## The Law: Failure at P²
+
+The answer is both exact and elegant. The first composite that slips past a dimension set containing all primes up to `P_k` is precisely **P_k² — the square of the next required prime**.
+
+This is not empirical. It follows directly from the Fundamental Theorem of Arithmetic:
+
+> Any composite number smaller than P_k² must have at least one prime factor smaller than P_k. Therefore, our existing mod dimensions will catch it. The very first composite that can consist *entirely* of factors ≥ P_k is P_k × P_k.
+
+## The Exact Sequence
+
+| Dimensions tracked | First composite to slip through | Must add |
+|--------------------|---------------------------------|----------|
+| `[]` | 4 (2 × 2) | `mod_2` |
+| `[mod_2]` | 9 (3 × 3) | `mod_3` |
+| `[mod_2, mod_3]` | 25 (5 × 5) | `mod_5` |
+| `[mod_2, mod_3, mod_5]` | 49 (7 × 7) | `mod_7` |
+| `[mod_2 … mod_7]` | 121 (11 × 11) | `mod_11` |
+| `[mod_2 … mod_11]` | 169 (13 × 13) | `mod_13` |
+| `[mod_2 … mod_13]` | 289 (17 × 17) | `mod_17` |
+
+<Note>
+This sequence is precisely the Sieve of Eratosthenes expressed as a machine learning dimension requirement. The AI, given only modular features, organically re-derives the sieve.
+</Note>
+
+## Mathematical Proof
+
+Let S = &#123; 2, 3, 5, …, P_k &#125; be the set of tracked prime dimensions.
+
+**Claim:** Every composite N < P_k² has at least one prime factor in S.
+
+**Proof:** Suppose N is composite and all prime factors of N are strictly greater than P_k. Then each factor is at least the next prime P_{k+1}. Therefore:
+
+```
+N ≥ P_{k+1} × P_{k+1} = P_{k+1}²
+```
+
+But P_{k+1}² > P_k² > N — a contradiction. So no composite below P_k² can have all factors outside S. The smallest composite that *can* have all factors ≥ P_{k+1} is P_{k+1} × P_{k+1}.
+
+Therefore **the threshold is exactly P_{k+1}²**, not approximately, not statistically — exactly.
+
+## Practical Implication: Scaling to 10,000
+
+To separate all primes up to N = 10,000 without any composite slipping through, the required upper bound on tracked dimensions is the largest prime P whose square does not exceed 10,000:
+
+| Prime | Square | Within 10,000? |
+|-------|--------|----------------|
+| 89 | 7,921 | Yes |
+| 97 | 9,409 | Yes |
+| 101 | 10,201 | **No** |
+
+Conclusion: `mod_97` is the last dimension required. Any composite below 10,000 must have a prime factor ≤ 97, so the dimension set `{ mod_2, mod_3, …, mod_97 }` guarantees zero slippage up to 9,409.
+
+<Tip>
+This is why the model is trained on numbers 1–10,000 with dimension coverage up to `mod_97`. The threshold is a mathematical guarantee, not a tuned hyperparameter.
+</Tip>
+
+## How the Ensemble Handles the Boundary
+
+Adding infinitely many mod dimensions as numbers grow is impractical. The project resolves this with a **two-stage ensemble**:
+
+**Stage 1 — The Decision Tree Filter (Model A):** Applies the rigid mod-dimension rules with mathematical certainty. It only eliminates a candidate if it is more than 95% confident. This prevents false positives from the "sledgehammer" effect — classifying a genuine prime as composite because it slightly resembles a known composite pattern at the boundary.
+
+**Stage 2 — The Deep Neural Network (Model B):** Numbers that survive Model A's filter are passed to a deep MLP. Instead of requiring a new explicit `mod_P` dimension for every new prime, the DNN learns non-linear geometric patterns across the existing fractal and remainder features. These patterns generalize beyond the training range.
+
+The result: the AI maintains approximately 86% accuracy across ranges far beyond its training data (10k–110k), with Model A's composite filter remaining perfectly stable across all tested ranges.
+
+<CardGroup cols={2}>
+  <Card title="Arithmetic Dimensions" href="/concepts/arithmetic-dimensions">
+    The full dimension vector and why each feature captures prime structure
+  </Card>
+  <Card title="Primorial Bases" href="/concepts/primorial-bases">
+    How base-6 and base-30 encode multiple mod dimensions in a single feature
+  </Card>
+  <Card title="Remainder Geometry" href="/concepts/remainder-geometry">
+    Fractal remainder patterns that generalize beyond explicit mod dimensions
+  </Card>
+  <Card title="Digit Sum Law" href="/concepts/digit-sum-law">
+    How digit sums provide alternative views of the same modular arithmetic
+  </Card>
+</CardGroup>

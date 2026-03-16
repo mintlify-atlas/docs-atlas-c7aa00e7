@@ -1,0 +1,126 @@
+---
+title: "Ensemble pipeline"
+description: "How Model A and Model B combine for surgical prime detection."
+---
+
+The ensemble combines a fast rule-based filter with a deep neural network. Each model operates on a different feature set and a different subset of numbers, producing a final prediction with zero false positives.
+
+## Inference logic
+
+<Steps>
+  <Step title="Feature extraction">
+    Every number $N$ in the evaluation range is passed through `extract_all_dimensions(N)`, producing a row of multi-dimensional features covering base-system endings, indivisibility flags, Fermat witnesses, and fractal remainder geometry.
+  </Step>
+
+  <Step title="Model A scoring">
+    Model A evaluates every number against the six `filter_features` using `predict_proba`:
+
+    ```python
+    probs_a = model_a.predict_proba(X_test_filter)[:, 1]
+    ```
+
+    This produces a probability P(prime) for each number.
+  </Step>
+
+  <Step title="Filter decision">
+    Numbers are split by threshold:
+
+    ```python
+    final_preds = np.zeros(len(test_df))        # default: all composite
+    unsure_mask = probs_a >= 0.01               # intersection candidates
+    ```
+
+    - P(prime) **< 0.01** → classified as **Composite** immediately. Model A is certain.
+    - P(prime) **≥ 0.01** → forwarded to Model B as an intersection candidate.
+  </Step>
+
+  <Step title="Model B scoring">
+    Only the intersection candidates are evaluated by Model B:
+
+    ```python
+    if intersections_sent > 0:
+        X_b = test_df[unsure_mask][complex_features]
+        b_probs = model_b.predict_proba(X_b)[:, 1]
+        b_preds = (b_probs > 0.9).astype(int)
+        final_preds[unsure_mask] = b_preds
+    ```
+
+    - P(prime) **> 0.9** → classified as **Prime**.
+    - P(prime) **≤ 0.9** → classified as **Composite**.
+  </Step>
+</Steps>
+
+## Full inference code
+
+```python
+X_test_filter = test_df[filter_features]
+y_test = test_df['is_prime']
+
+probs_a = model_a.predict_proba(X_test_filter)[:, 1]
+
+final_preds = np.zeros(len(test_df))
+unsure_mask = probs_a >= 0.01  # lower threshold due to heavy class-0 weighting
+intersections_sent = unsure_mask.sum()
+
+if intersections_sent > 0:
+    X_b = test_df[unsure_mask][complex_features]
+    # Use high-precision probability threshold for Model B
+    b_probs = model_b.predict_proba(X_b)[:, 1]
+    b_preds = (b_probs > 0.9).astype(int)
+    final_preds[unsure_mask] = b_preds
+```
+
+## Example trace: N = 1111 vs N = 3001
+
+These two numbers share identical values for `is_even`, `ends_with`, `digit_sum`, `mod_3`, `mod_5`, and `mod_7` — a classic intersection. Here is how the ensemble handles them:
+
+| Step | N = 1111 (composite: 11 × 101) | N = 3001 (prime) |
+|:---|:---|:---|
+| `last_digit_base6` | 1 | 1 |
+| `last_digit_base30` | 1 | 1 |
+| Model A P(prime) | ≥ 0.01 — forwarded | ≥ 0.01 — forwarded |
+| `fermat_flag_base2` | 0 (2¹¹¹⁰ mod 1111 ≠ 1) | 1 (2³⁰⁰⁰ mod 3001 = 1) |
+| `fermat_flag_base3` | 0 | 1 |
+| Model B P(prime) | Low (< 0.9) → **Composite** | High (> 0.9) → **Prime** |
+
+The Fermat witnesses provide the critical signal that base-system features alone cannot.
+
+## Design choices
+
+### Conservative thresholds guarantee precision
+
+Both thresholds are deliberately conservative:
+
+- Model A's 0.01 threshold ensures that **any number with even a slight chance of being prime** is forwarded rather than discarded.
+- Model B's 0.9 threshold ensures that **only highly confident prime predictions** are accepted.
+
+The result is zero false positives (composites labelled prime) at the cost of some recall (some primes are missed).
+
+### The Cyclical Modulo fix
+
+Without this fix, raw digit sums grow as $O(\log N)$ and magnitude caps appear as $N$ approaches large values. The fix converts all digit sums to `modulo(Base-1)` values:
+
+- `sum_base3_mod = sum_of_digits(n, 3) % 2` (tied to `mod_2`)
+- `sum_base6_mod = sum_of_digits(n, 6) % 5` (tied to `mod_5`)
+- `sum_base10_mod = sum_of_digits(n, 10) % 9` (tied to `mod_9`)
+
+This keeps all features in a fixed, bounded range regardless of how large $N$ grows, giving the model consistent input at 10k, 100k, or 1,000,000.
+
+### The class weight fix
+
+The `{0: 20, 1: 1}` class weight in Model A's training makes false positives 20× more expensive than false negatives. This prevents Model A from hedging toward "prime" on ambiguous cases — it defaults to forwarding uncertain numbers rather than eliminating them.
+
+<CardGroup cols={2}>
+  <Card title="Model A: Base-System Filter" href="/architecture/model-a-filter">
+    Deep dive into the Decision Tree filter.
+  </Card>
+  <Card title="Model B: Deep Neural Network" href="/architecture/model-b-dnn">
+    Deep dive into the MLP intersection resolver.
+  </Card>
+  <Card title="Dataset and splitting" href="/training/dataset">
+    How training and test data was structured.
+  </Card>
+  <Card title="Training results" href="/training/results">
+    Performance benchmarks across all ranges.
+  </Card>
+</CardGroup>

@@ -1,0 +1,107 @@
+---
+title: "Digit Sum Law"
+description: "The mathematical equivalence between digit sums in base B and modulo (B−1)."
+---
+
+## The Law
+
+For any integer N and any base B:
+
+> **The sum of the digits of N in base B is congruent to N modulo (B − 1).**
+
+Formally: `digit_sum(N, B) ≡ N (mod B−1)`
+
+This is not an approximation. It is an exact equivalence — every digit sum carries the same divisibility information as the corresponding modular residue.
+
+## Specific Instantiations
+
+### Base-3 → mod 2
+
+Base-3 has digits {0, 1, 2}, and B − 1 = 2. Therefore the digit sum of N in base 3, taken mod 2, tells you whether N is even or odd.
+
+If a number's base-3 digit sum is even → the number itself is even → composite (except N = 2).
+
+### Base-6 → mod 5
+
+Base-6, B − 1 = 5. If the digit sum of N in base 6 is divisible by 5, then N itself is divisible by 5 → composite (except N = 5).
+
+### Base-10 → mod 9 / mod 3
+
+This is the familiar "casting out nines" rule. Base-10, B − 1 = 9. If the digit sum of N in base 10 is divisible by 9, then N is divisible by 9. If divisible by 3, then N is divisible by 3. Both guarantee compositeness.
+
+### Base-16 → mod 15
+
+Hexadecimal, B − 1 = 15 = 3 × 5. If the hex digit sum is divisible by 15, 3, or 5, the number is composite. This provides simultaneous divisibility checks for both 3 and 5 from a single hex representation.
+
+## The Code
+
+```python
+# From neural_encoder.py
+dimensions['sum_base3_mod'] = sum_of_digits(n, 3) % 2
+dimensions['sum_base6_mod'] = sum_of_digits(n, 6) % 5
+dimensions['sum_base10_mod'] = sum_of_digits(n, 10) % 9
+```
+
+Each line computes a digit sum in the specified base, then reduces it to the relevant modulus. The result is numerically equivalent to `n % 2`, `n % 5`, and `n % 9` respectively — but encoded through the digit sum pathway rather than direct division.
+
+## Why This Matters for Machine Learning
+
+If digit sums and modular residues carry identical information, why include both in the feature vector?
+
+Because a neural network is not an algebraic simplifier. It learns from examples. Providing the same mathematical property through two different computational pathways gives the network **multiple independent views** of the same constraint:
+
+1. A tree-based model can split on `sum_base10_mod == 0` as a proxy for "divisible by 9" without ever computing `N % 9` explicitly.
+2. A neural network can find cross-feature interactions between `sum_base6_mod` and `last_digit_base30` that no single modular residue exposes.
+3. Redundant representations make the network robust to individual feature noise.
+
+<Info>
+The walkthrough notes that in the initial feature set, `digit_sum` and `digit_root` were both discarded by the Decision Tree AI because `mod_3` mathematically captured the same information more cleanly. The Digit Sum Law explains exactly why: `digit_sum(N, 10) % 3 == N % 3`. The AI detected the redundancy automatically.
+</Info>
+
+## The Maximum Missing Digit Law
+
+The Digit Sum Law has a boundary consequence that directly constraints the maximum digit sum any prime can have.
+
+A number consisting entirely of 9s — `99`, `999`, `9999` — has the maximum possible digit sum for its length: 9 × L, where L is the number of digits. But every such number is divisible by 9 (digit sum divisible by 9), and therefore composite.
+
+**Formula: Maximum prime digit sum for L digits = (9 × L) − 1**
+
+To escape divisibility by 9, at least one digit must be reduced from 9 to 8, lowering the sum by 1.
+
+### Examples
+
+| Length | Max theoretical sum | Max possible for a prime | Highest prime at that length |
+|--------|--------------------|--------------------------|---------------------------------|
+| 2 | 18 (= 99) | 17 | 89 (digit sum 17) |
+| 3 | 27 (= 999) | 26 | 997 (digit sum 25) |
+| 4 | 36 (= 9999) | 35 | 8999 (digit sum 35) |
+| 5 | 45 (= 99999) | 44 | 99989 (digit sum 44) |
+
+<Note>
+997 has digit sum 25, not 26, because the candidate 998 (sum 26) is even, and 989 (sum 26) = 23 × 43. The formula gives the ceiling, not the guaranteed achievable value for every length.
+</Note>
+
+### The Code
+
+```python
+# From neural_encoder.py
+max_sum_theoretical = (9 * dimensions['len_base10'])
+dimensions['distance_from_max_sum'] = max_sum_theoretical - sum_of_digits(n, 10)
+```
+
+A `distance_from_max_sum` of 0 is mathematically impossible for any prime (the number would be all 9s). A very small distance (1 or 2) signals high digit density — a positive signal that complements the binary density features.
+
+<CardGroup cols={2}>
+  <Card title="Arithmetic Dimensions" href="/concepts/arithmetic-dimensions">
+    The complete feature vector including all digit sum dimensions
+  </Card>
+  <Card title="Primorial Bases" href="/concepts/primorial-bases">
+    How base-6 and base-30 connect to the digit sum law
+  </Card>
+  <Card title="Binary Density" href="/concepts/binary-density">
+    How digit density in binary separates primes from composites
+  </Card>
+  <Card title="Modulo Shift Threshold" href="/concepts/modulo-shift-threshold">
+    When new modular dimensions become mathematically necessary
+  </Card>
+</CardGroup>

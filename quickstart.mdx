@@ -1,80 +1,142 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Get the Prime Number Neural Network running on your machine in under 5 minutes."
 ---
 
-## Get started in three steps
+<Tip>
+  Start with `feature_miner.py` before running the full ensemble. It runs in seconds and immediately demonstrates how arithmetic dimensions reveal prime structure.
+</Tip>
 
-Get your documentation site running locally and make your first customization.
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/ShanmuganandK/Primenumber_nueral_network.git
+    cd Primenumber_nueral_network
+    ```
+  </Step>
 
-### Step 1: Set up your local environment
+  <Step title="Install dependencies">
+    ```bash
+    pip install numpy pandas scikit-learn sympy
+    ```
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    The four libraries each serve a specific role:
 
-### Step 2: Deploy your changes
+    | Package | Purpose |
+    |:---|:---|
+    | `numpy` | Array operations and binary representation utilities |
+    | `pandas` | DataFrame construction for the multi-dimensional dataset |
+    | `scikit-learn` | `DecisionTreeClassifier` (Model A) and `MLPClassifier` (Model B) |
+    | `sympy` | `isprime()` — the ground-truth oracle for labeling training data |
+  </Step>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+  <Step title="Run the basic feature miner">
+    The feature miner analyzes integers 1 through 100 and prints the arithmetic rules it discovers:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    ```bash
+    python feature_miner.py
+    ```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    Expected output:
 
-### Step 3: Go live
+    ```text
+    Extracting dimensions for numbers 1 to 100...
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    Total Primes: 25
+    Total Composites: 74
 
-## Next steps
+    --- POSITIVE RULES FOR COMPOSITES ---
+    Rule 1 [is_even and > 2]: Captures 49 composite numbers.
+    Rule 2 [ends_with 5 and > 5]: Captures 9 composite numbers.
+    Rule 3 [digit_root in (3,6,9) and > 3]: Captures 30 composite numbers.
 
-Now that you have your docs running, explore these key features:
+    Composites NOT covered by these 3 rules: [49, 77, 91]
+    Notice anything? These are all multiples of 7: [49, 77, 91]
 
-<CardGroup cols={2}>
+    --- OBSERVATIONS ON PRIMES ---
+    Primes > 5 ONLY end in digits: [1, 3, 7, 9]
+    Primes > 3 ONLY have digit roots: [1, 2, 4, 5, 7, 8] (Never 3, 6, or 9)
+    ```
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+    The three composite rules eliminate most numbers immediately. The three survivors — `49`, `77`, `91` — are all multiples of 7, demonstrating exactly why the `mod_7` dimension is required as the next filter stage.
+  </Step>
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+  <Step title="Run the full two-stage ensemble">
+    ```bash
+    python neural_net.py
+    ```
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+    This script builds and evaluates the two-stage pipeline:
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+    1. **Generates data** for integers 1 – 20,000, encoding each number using `extract_all_dimensions()`.
+    2. **Trains Model A** — a shallow `DecisionTreeClassifier` (max depth 5) on base-system filter features: `last_digit_base6`, `last_digit_base30`, digit sums, and even-length palindrome flags. Model A eliminates the roughly 70% of integers that are obviously composite.
+    3. **Trains Model B** — a `MLPClassifier` with hidden layers `(64, 128, 64)` and ReLU activations on the candidates that survived Model A (the "intersections"). Model B uses complex features: binary ratios, `distance_from_max_sum`, and `last_digit_base210`.
+    4. **Evaluates the ensemble** on the completely unseen range 10,001 – 20,000, reporting overall accuracy and a full classification report broken down by Composite and Prime.
+  </Step>
 
-</CardGroup>
+  <Step title="Run the comprehensive evaluation">
+    ```bash
+    python final_ensemble_test.py
+    ```
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+    This script re-trains the ensemble on 1 – 10,000 and evaluates it against three unseen ranges:
+
+    - **10,001 – 20,000**: near-range extrapolation
+    - **50,000 – 60,000**: mid-range extrapolation
+    - **100,000 – 110,000**: far-range extrapolation
+
+    The final ensemble uses a stricter Model A configuration — `class_weight={0: 20, 1: 1}` to heavily penalize false positives — and a high-confidence threshold of `0.9` on Model B's probability output before labeling any number as prime.
+
+    <Note>
+      `final_ensemble_test.py` generates feature vectors for approximately 130,000 numbers, including Fermat witness calculations via modular exponentiation. Expect a runtime of several minutes depending on your machine.
+    </Note>
+  </Step>
+
+  <Step title="Extract dimensions for a single number">
+    You can call the encoder directly to inspect the full feature vector for any integer:
+
+    ```python
+    from neural_encoder import extract_all_dimensions
+
+    dims = extract_all_dimensions(17)
+    for k, v in dims.items():
+        print(f"{k}: {v}")
+    ```
+
+    Example output for `n = 17`:
+
+    ```text
+    last_digit_base6: 5
+    last_digit_base10: 7
+    last_digit_base30: 17
+    sum_base3_mod: 1
+    sum_base6_mod: 2
+    sum_base10_mod: 8
+    is_indivisible_by_2: 1
+    is_indivisible_by_3: 1
+    is_indivisible_by_5: 1
+    is_indivisible_by_7: 1
+    fermat_flag_base2: 1
+    fermat_flag_base3: 1
+    fermat_flag_base5: 1
+    fermat_flag_base7: 1
+    dist_to_square: 2
+    modular_inverse_2: 9
+    is_rem_9_prime: 0
+    is_rem_30_prime: 1
+    rem_30_base3_sum: 5
+    rem_9_bin_pop: 0
+    is_palindrome_10: 0
+    len_base10: 2
+    ratio_base10: 4.0
+    distance_from_max_sum: 10
+    ```
+
+    Key things to notice about `17`:
+
+    - `last_digit_base6: 5` — ends in 5 in Base-6, which is one of only two valid prime endings `[1, 5]`.
+    - All four `fermat_flag_*` values are `1` — 17 passes all four Fermat primality witnesses, a near-definitive primality signal.
+    - `is_rem_30_prime: 1` — the remainder `17 mod 30 = 17` is itself prime, activating the Prime Feedback Effect.
+    - `rem_30_base3_sum: 5` — the Base-3 digit sum of that remainder is exactly 5, activating the +150% Fractal Geometry signal.
+  </Step>
+</Steps>
